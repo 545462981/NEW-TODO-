@@ -1,1 +1,110 @@
-<html><body><h1>Hello</h1></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>待办事项记事本</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>待办事项</h1>
+      <span class="header-date" id="headerDate"></span>
+    </header>
+    <main class="board">
+      <!-- 待办列 -->
+      <div class="column" data-status="todo" id="column-todo">
+        <div class="column-header">
+          <span class="column-icon">📋</span>
+          <span class="column-title">待办</span>
+          <span class="column-count" id="count-todo">0</span>
+        </div>
+        <div class="task-list" id="list-todo"></div>
+        <button class="add-btn" onclick="openAddModal('todo')">+ 新增任务</button>
+      </div>
+      <!-- 进行中列 -->
+      <div class="column" data-status="in-progress" id="column-in-progress">
+        <div class="column-header">
+          <span class="column-icon">🔄</span>
+          <span class="column-title">进行中</span>
+          <span class="column-count" id="count-in-progress">0</span>
+        </div>
+        <div class="task-list" id="list-in-progress"></div>
+      </div>
+      <!-- 已完成列 -->
+      <div class="column" data-status="done" id="column-done">
+        <div class="column-header">
+          <span class="column-icon">✅</span>
+          <span class="column-title">已完成</span>
+          <span class="column-count" id="count-done">0</span>
+        </div>
+        <div class="task-list" id="list-done"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 新增/编辑任务弹窗 -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="modalTitle">新增任务</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="taskId">
+        <input type="hidden" id="taskStatus">
+        <div class="form-group">
+          <label>任务标题 <span class="required">*</span></label>
+          <input type="text" id="taskTitle" placeholder="输入任务标题..." autofocus>
+        </div>
+        <div class="form-group">
+          <label>优先级</label>
+          <div class="priority-selector" id="prioritySelector">
+            <button class="priority-option selected" data-priority="medium" type="button">
+              <span class="priority-dot medium"></span> 中
+            </button>
+            <button class="priority-option" data-priority="high" type="button">
+              <span class="priority-dot high"></span> 高
+            </button>
+            <button class="priority-option" data-priority="low" type="button">
+              <span class="priority-dot low"></span> 低
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>截止日期</label>
+          <input type="date" id="taskDueDate">
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea id="taskNote" rows="3" placeholder="添加备注..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal()">取消</button>
+        <button class="btn-save" onclick="saveTask()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认弹窗 -->
+  <div class="modal-overlay" id="confirmOverlay" onclick="closeConfirm()">
+    <div class="modal modal-sm" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>确认删除</h2>
+      </div>
+      <div class="modal-body">
+        <p>确定要删除这个任务吗？此操作不可撤销。</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeConfirm()">取消</button>
+        <button class="btn-danger" id="confirmDeleteBtn">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="store.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
