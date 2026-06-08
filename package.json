@@ -11,8 +11,13 @@
     "appId": "com.todo.notepad",
     "productName": "待办事项记事本",
     "win": {
-      "target": "portable",
-      "icon": "assets/icon.png"
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "signAndEditExecutable": false
     },
     "portable": {
       "artifactName": "待办事项记事本.exe"
