@@ -37,19 +37,21 @@ function saveConfig(config) {
 
 // === 创建托盘图标 ===
 function createTrayIcon() {
-  // 用 nativeImage 画一个 16x16 的图标
+  const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
+  if (fs.existsSync(iconPath)) {
+    return nativeImage.createFromPath(iconPath);
+  }
+  // 降级：没有图标文件时生成一个简单的蓝色方块
   const size = 16;
   const buf = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      // 圆角矩形 + 勾选标记图案
-      const cx = x - 8, cy = y - 8;
-      const inCircle = cx * cx + cy * cy < 56;
-      buf[i] = 0x00;       // R
-      buf[i + 1] = inCircle ? 0x7A : 0x00;  // G
-      buf[i + 2] = inCircle ? 0xFF : 0x00;  // B
-      buf[i + 3] = inCircle ? 0xFF : 0x00;  // A
+      const inCircle = (x - 8) * (x - 8) + (y - 8) * (y - 8) < 56;
+      buf[i] = 0x00;
+      buf[i + 1] = inCircle ? 0x7A : 0x00;
+      buf[i + 2] = inCircle ? 0xFF : 0x00;
+      buf[i + 3] = inCircle ? 0xFF : 0x00;
     }
   }
   return nativeImage.createFromBuffer(buf, { width: size, height: size });
