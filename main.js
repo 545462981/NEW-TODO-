@@ -1,9 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // 数据文件路径：%USERPROFILE%/.todo-notepad/tasks.json
-const DATA_DIR = path.join(require('os').homedir(), '.todo-notepad');
+const DATA_DIR = path.join(os.homedir(), '.todo-notepad');
 const DATA_FILE = path.join(DATA_DIR, 'tasks.json');
 
 function ensureDataDir() {
@@ -30,8 +31,16 @@ function saveTasks(tasks) {
   ensureDataDir();
   // 原子写入：先写临时文件，再重命名
   const tmpFile = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmpFile, JSON.stringify(tasks, null, 2), 'utf-8');
-  fs.renameSync(tmpFile, DATA_FILE);
+  try {
+    fs.writeFileSync(tmpFile, JSON.stringify(tasks, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, DATA_FILE);
+    return true;
+  } catch (e) {
+    console.error('保存任务失败:', e.message);
+    // 清理临时文件
+    try { fs.unlinkSync(tmpFile); } catch (_) { /* ignore */ }
+    return false;
+  }
 }
 
 function createWindow() {
