@@ -1,0 +1,30 @@
+{
+  "name": "todo-notepad",
+  "version": "1.0.0",
+  "description": "待办事项记事本 - iOS 简约风格",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.todo.notepad",
+    "productName": "待办事项记事本",
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.png"
+    },
+    "portable": {
+      "artifactName": "待办事项记事本.exe"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
