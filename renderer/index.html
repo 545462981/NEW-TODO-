@@ -80,6 +80,17 @@
           <label>备注</label>
           <textarea id="taskNote" rows="3" placeholder="添加备注..."></textarea>
         </div>
+        <div class="form-group">
+          <label>图片附件</label>
+          <div class="image-upload-zone" id="imageUploadZone">
+            <div class="image-thumbs" id="imageThumbs"></div>
+            <div class="image-drop-hint">
+              <span class="image-drop-icon">🖼️</span>
+              <span>拖拽图片 / 点击选择 / Ctrl+V 粘贴</span>
+            </div>
+            <input type="file" id="imageFileInput" accept="image/*" multiple hidden>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal()">取消</button>
@@ -101,6 +112,18 @@
         <button class="btn-cancel" onclick="closeConfirm()">取消</button>
         <button class="btn-danger" id="confirmDeleteBtn">删除</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 图片查看器 -->
+  <div class="image-viewer-overlay" id="imageViewerOverlay" onclick="closeImageViewer()">
+    <div class="image-viewer" onclick="event.stopPropagation()">
+      <button class="image-viewer-close" onclick="closeImageViewer()">&times;</button>
+      <button class="image-viewer-nav image-viewer-prev" id="viewerPrev">‹</button>
+      <img id="viewerImage" src="" alt="">
+      <button class="image-viewer-nav image-viewer-next" id="viewerNext">›</button>
+      <button class="image-viewer-delete" id="viewerDelete" title="删除此图片">🗑️</button>
+      <div class="image-viewer-counter" id="viewerCounter"></div>
     </div>
   </div>
 

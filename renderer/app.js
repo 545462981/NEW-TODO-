@@ -2,6 +2,11 @@
 let editingTaskId = null;
 let deleteTargetId = null;
 let currentPriority = 'medium';
+let pendingImages = [];      // 待上传的 base64 图片
+let existingImages = [];     // 编辑时已有的图片文件名列表
+let viewerImages = [];       // 查看器中的图片列表
+let viewerIndex = 0;         // 当前查看的图片索引
+let viewerTaskId = null;     // 查看器所属任务 ID
 
 // === 初始化 ===
 async function init() {
@@ -30,6 +35,9 @@ async function init() {
 
   // 设置拖放事件
   setupDragAndDrop();
+
+  // 设置图片上传
+  setupImageUpload();
 }
 
 // === 渲染看板 ===
@@ -252,6 +260,9 @@ function closeConfirm() {
 
 // === 键盘快捷键 ===
 document.addEventListener('keydown', (e) => {
+  // 查看器打开时不处理这些快捷键
+  if (document.getElementById('imageViewerOverlay').classList.contains('show')) return;
+
   // ESC 关闭弹窗
   if (e.key === 'Escape') {
     if (document.getElementById('confirmOverlay').classList.contains('show')) {
@@ -378,3 +389,294 @@ function getDragAfterElement(container, y) {
 
 // === 启动 ===
 init();
+
+// ============== 图片功能 ==============
+
+// 设置图片上传区域事件
+function setupImageUpload() {
+  const zone = document.getElementById('imageUploadZone');
+  const input = document.getElementById('imageFileInput');
+
+  // 点击上传区选择文件
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    handleFiles(input.files);
+    input.value = '';
+  });
+
+  // 拖拽上传
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => {
+    zone.classList.remove('drag-over');
+  });
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  // Ctrl+V 粘贴图片（在弹窗内）
+  document.addEventListener('paste', (e) => {
+    if (!document.getElementById('modalOverlay').classList.contains('show')) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        handleFiles([file]);
+        break;
+      }
+    }
+  });
+
+  // 图片查看器事件
+  document.getElementById('viewerPrev').addEventListener('click', () => navigateViewer(-1));
+  document.getElementById('viewerNext').addEventListener('click', () => navigateViewer(1));
+  document.getElementById('viewerDelete').addEventListener('click', deleteViewerImage);
+
+  // 键盘 ← → 切换图片
+  document.addEventListener('keydown', (e) => {
+    if (!document.getElementById('imageViewerOverlay').classList.contains('show')) return;
+    if (e.key === 'ArrowLeft') navigateViewer(-1);
+    if (e.key === 'ArrowRight') navigateViewer(1);
+    if (e.key === 'Escape') closeImageViewer();
+  });
+}
+
+// 处理文件：转 base64 并显示缩略图
+function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      pendingImages.push(e.target.result);
+      renderImageThumbs();
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// 渲染弹窗中的缩略图
+function renderImageThumbs() {
+  const container = document.getElementById('imageThumbs');
+  container.innerHTML = '';
+
+  // 已有图片（编辑时）
+  existingImages.forEach((filename, idx) => {
+    loadExistingThumb(filename, idx, container);
+  });
+
+  // 待上传的图片
+  pendingImages.forEach((base64, idx) => {
+    const img = document.createElement('img');
+    img.className = 'image-thumb';
+    img.src = base64;
+    img.title = '点击移除';
+    img.addEventListener('click', () => {
+      pendingImages.splice(idx, 1);
+      renderImageThumbs();
+    });
+    container.appendChild(img);
+  });
+}
+
+// 加载已有图片的缩略图
+async function loadExistingThumb(filename, idx, container) {
+  const base64 = await window.todoAPI.readImage(editingTaskId, filename);
+  if (!base64) return;
+  const img = document.createElement('img');
+  img.className = 'image-thumb';
+  img.src = base64;
+  img.title = '点击移除';
+  img.addEventListener('click', () => {
+    existingImages.splice(idx, 1);
+    renderImageThumbs();
+  });
+  container.appendChild(img);
+}
+
+// 修改 openAddModal，重置图片
+const _origOpenAddModal = openAddModal;
+openAddModal = function(status) {
+  pendingImages = [];
+  existingImages = [];
+  _origOpenAddModal(status);
+  renderImageThumbs();
+};
+
+// 修改 openEditModal，加载已有图片
+const _origOpenEditModal = openEditModal;
+openEditModal = function(taskId) {
+  _origOpenEditModal(taskId);
+  const task = Store.getById(taskId);
+  pendingImages = [];
+  existingImages = task && task.images ? [...task.images] : [];
+  renderImageThumbs();
+};
+
+// 修改 saveTask，保存图片
+const _origSaveTask = saveTask;
+saveTask = async function() {
+  const taskId = editingTaskId || Store.generateId();
+
+  // 先保存待上传的新图片
+  const savedFilenames = [];
+  for (const base64 of pendingImages) {
+    const filename = await window.todoAPI.saveImage(taskId, base64);
+    if (filename) savedFilenames.push(filename);
+  }
+
+  // 删除在编辑中被移除的已有图片
+  if (editingTaskId) {
+    const task = Store.getById(editingTaskId);
+    if (task && task.images) {
+      for (const oldFile of task.images) {
+        if (!existingImages.includes(oldFile)) {
+          await window.todoAPI.deleteImage(editingTaskId, oldFile);
+        }
+      }
+    }
+  }
+
+  // 合并最终图片列表
+  const allImages = [...existingImages, ...savedFilenames];
+
+  // 保存到任务数据中（如果新增，需要等 saveTask 创建了任务再更新 images）
+  if (editingTaskId) {
+    Store.update(editingTaskId, { images: allImages });
+  }
+
+  _origSaveTask();
+
+  // 新增任务的情况，saveTask 里 Store.add 会创建任务，我们需要更新 images
+  if (!editingTaskId) {
+    // 找到刚创建的任务（最后一条）
+    const newTask = Store.tasks[Store.tasks.length - 1];
+    if (newTask && savedFilenames.length > 0) {
+      Store.update(newTask.id, { images: savedFilenames });
+    }
+  }
+
+  pendingImages = [];
+  existingImages = [];
+};
+
+// 修改 createTaskCard，添加缩略图
+const _origCreateTaskCard = createTaskCard;
+createTaskCard = function(task) {
+  const card = _origCreateTaskCard(task);
+
+  // 添加图片缩略图
+  if (task.images && task.images.length > 0) {
+    const imagesDiv = document.createElement('div');
+    imagesDiv.className = 'task-card-images';
+
+    const maxShow = 3;
+    task.images.slice(0, maxShow).forEach((filename, idx) => {
+      loadCardThumb(imagesDiv, task.id, filename, idx);
+    });
+
+    if (task.images.length > maxShow) {
+      const more = document.createElement('div');
+      more.className = 'task-card-thumb-more';
+      more.textContent = `+${task.images.length - maxShow}`;
+      more.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openImageViewer(task.id, 0);
+      });
+      imagesDiv.appendChild(more);
+    }
+
+    card.appendChild(imagesDiv);
+  }
+
+  return card;
+};
+
+// 加载卡片缩略图
+async function loadCardThumb(container, taskId, filename, idx) {
+  const base64 = await window.todoAPI.readImage(taskId, filename);
+  if (!base64) return;
+  const img = document.createElement('img');
+  img.className = 'task-card-thumb';
+  img.src = base64;
+  img.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openImageViewer(taskId, idx);
+  });
+  container.appendChild(img);
+}
+
+// 打开图片查看器
+async function openImageViewer(taskId, startIdx) {
+  const task = Store.getById(taskId);
+  if (!task || !task.images || task.images.length === 0) return;
+
+  viewerTaskId = taskId;
+  viewerImages = [];
+  viewerIndex = startIdx;
+
+  // 加载所有图片的 base64
+  for (const filename of task.images) {
+    const base64 = await window.todoAPI.readImage(taskId, filename);
+    if (base64) viewerImages.push({ filename, base64 });
+  }
+
+  if (viewerImages.length === 0) return;
+
+  document.getElementById('imageViewerOverlay').classList.add('show');
+  updateViewerImage();
+}
+
+// 更新查看器中的图片
+function updateViewerImage() {
+  if (viewerImages.length === 0) return;
+  const item = viewerImages[viewerIndex];
+  document.getElementById('viewerImage').src = item.base64;
+  document.getElementById('viewerCounter').textContent = `${viewerIndex + 1} / ${viewerImages.length}`;
+}
+
+// 切换图片
+function navigateViewer(delta) {
+  viewerIndex = (viewerIndex + delta + viewerImages.length) % viewerImages.length;
+  updateViewerImage();
+}
+
+// 删除查看器中的图片
+async function deleteViewerImage() {
+  if (!viewerTaskId || viewerImages.length === 0) return;
+
+  const item = viewerImages[viewerIndex];
+  await window.todoAPI.deleteImage(viewerTaskId, item.filename);
+
+  const task = Store.getById(viewerTaskId);
+  if (task && task.images) {
+    const newImages = task.images.filter(f => f !== item.filename);
+    Store.update(viewerTaskId, { images: newImages });
+  }
+
+  viewerImages.splice(viewerIndex, 1);
+
+  if (viewerImages.length === 0) {
+    closeImageViewer();
+    renderBoard();
+    return;
+  }
+
+  if (viewerIndex >= viewerImages.length) viewerIndex = viewerImages.length - 1;
+  updateViewerImage();
+  renderBoard();
+}
+
+// 关闭查看器
+function closeImageViewer() {
+  document.getElementById('imageViewerOverlay').classList.remove('show');
+  viewerTaskId = null;
+  viewerImages = [];
+  viewerIndex = 0;
+}

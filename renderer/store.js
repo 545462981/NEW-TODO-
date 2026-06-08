@@ -31,6 +31,7 @@ const Store = {
       priority: taskData.priority || 'medium',
       dueDate: taskData.dueDate || '',
       note: taskData.note || '',
+      images: [],
       createdAt: new Date().toISOString()
     };
     this.tasks.push(task);
@@ -48,17 +49,20 @@ const Store = {
     if (updates.priority !== undefined) task.priority = updates.priority;
     if (updates.dueDate !== undefined) task.dueDate = updates.dueDate;
     if (updates.note !== undefined) task.note = updates.note;
+    if (updates.images !== undefined) task.images = updates.images;
 
     this.save();
     return task;
   },
 
   // 删除任务
-  remove(id) {
+  async remove(id) {
     const index = this.tasks.findIndex(t => t.id === id);
     if (index === -1) return false;
     this.tasks.splice(index, 1);
     this.save();
+    // 清理图片文件
+    await window.todoAPI.deleteImageDir(id);
     return true;
   },
 
