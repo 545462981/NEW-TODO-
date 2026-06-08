@@ -497,6 +497,12 @@ body {
   display: none;
 }
 
+.image-thumb-wrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
 .image-thumb {
   width: 64px;
   height: 64px;
@@ -509,6 +515,34 @@ body {
 
 .image-thumb:hover {
   border-color: var(--blue);
+}
+
+.image-thumb-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.image-thumb-wrapper:hover .image-thumb-remove {
+  opacity: 1;
+}
+
+.image-thumb-remove:hover {
+  background: var(--red);
 }
 
 /* === 卡片上的缩略图 === */

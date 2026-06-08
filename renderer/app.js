@@ -473,15 +473,29 @@ function renderImageThumbs() {
 
   // 待上传的图片
   pendingImages.forEach((base64, idx) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-thumb-wrapper';
+
     const img = document.createElement('img');
     img.className = 'image-thumb';
     img.src = base64;
-    img.title = '点击移除';
-    img.addEventListener('click', () => {
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showSimplePreview(base64);
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'image-thumb-remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       pendingImages.splice(idx, 1);
       renderImageThumbs();
     });
-    container.appendChild(img);
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(removeBtn);
+    container.appendChild(wrapper);
   });
 }
 
@@ -489,15 +503,42 @@ function renderImageThumbs() {
 async function loadExistingThumb(filename, idx, container) {
   const base64 = await window.todoAPI.readImage(editingTaskId, filename);
   if (!base64) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-thumb-wrapper';
+
   const img = document.createElement('img');
   img.className = 'image-thumb';
   img.src = base64;
-  img.title = '点击移除';
-  img.addEventListener('click', () => {
+  img.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showSimplePreview(base64);
+  });
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'image-thumb-remove';
+  removeBtn.innerHTML = '&times;';
+  removeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     existingImages.splice(idx, 1);
     renderImageThumbs();
   });
-  container.appendChild(img);
+
+  wrapper.appendChild(img);
+  wrapper.appendChild(removeBtn);
+  container.appendChild(wrapper);
+}
+
+// 简单图片预览（弹窗中的图片点击放大）
+function showSimplePreview(base64) {
+  document.getElementById('viewerImage').src = base64;
+  document.getElementById('viewerCounter').textContent = '';
+  document.getElementById('viewerPrev').style.display = 'none';
+  document.getElementById('viewerNext').style.display = 'none';
+  document.getElementById('viewerDelete').style.display = 'none';
+  document.getElementById('imageViewerOverlay').classList.add('show');
+  viewerTaskId = null;
+  viewerImages = [];
 }
 
 // 修改 openAddModal，重置图片
@@ -676,6 +717,10 @@ async function deleteViewerImage() {
 // 关闭查看器
 function closeImageViewer() {
   document.getElementById('imageViewerOverlay').classList.remove('show');
+  // 恢复查看器控件
+  document.getElementById('viewerPrev').style.display = '';
+  document.getElementById('viewerNext').style.display = '';
+  document.getElementById('viewerDelete').style.display = '';
   viewerTaskId = null;
   viewerImages = [];
   viewerIndex = 0;
