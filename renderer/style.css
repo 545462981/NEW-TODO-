@@ -45,6 +45,74 @@ body {
   letter-spacing: -0.5px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.header-settings-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.header-settings-btn:hover {
+  background: var(--separator);
+}
+
+.settings-popover {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 8px 0;
+  min-width: 220px;
+  z-index: 100;
+}
+
+.settings-popover.show {
+  display: block;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.settings-item:hover {
+  background: #F2F2F7;
+}
+
+.settings-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
 .header-date {
   font-size: 15px;
   color: var(--text-secondary);

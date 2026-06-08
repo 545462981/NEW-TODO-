@@ -9,7 +9,16 @@
 <body>
   <div id="app">
     <header class="app-header">
-      <h1>待办事项</h1>
+      <div class="header-left">
+        <h1>待办事项</h1>
+        <button class="header-settings-btn" id="settingsBtn" title="设置" onclick="toggleSettings(event)">⚙️</button>
+        <div class="settings-popover" id="settingsPopover">
+          <label class="settings-item" id="trayToggleLabel">
+            <span>关闭时最小化到托盘</span>
+            <input type="checkbox" id="trayToggle">
+          </label>
+        </div>
+      </div>
       <span class="header-date" id="headerDate"></span>
     </header>
     <main class="board">

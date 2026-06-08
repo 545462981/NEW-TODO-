@@ -1,12 +1,17 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// 数据文件路径：%USERPROFILE%/.todo-notepad/tasks.json
+// 数据文件路径：%USERPROFILE%/.todo-notepad/
 const DATA_DIR = path.join(os.homedir(), '.todo-notepad');
 const DATA_FILE = path.join(DATA_DIR, 'tasks.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const IMAGES_DIR = path.join(DATA_DIR, 'images');
+
+let mainWindow = null;
+let tray = null;
+let closeToTray = true;
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -14,6 +19,87 @@ function ensureDataDir() {
   }
 }
 
+// === 配置文件 ===
+function loadConfig() {
+  ensureDataDir();
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+    }
+  } catch (_) {}
+  return { closeToTray: true };
+}
+
+function saveConfig(config) {
+  ensureDataDir();
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+// === 创建托盘图标 ===
+function createTrayIcon() {
+  // 用 nativeImage 画一个 16x16 的图标
+  const size = 16;
+  const buf = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      // 圆角矩形 + 勾选标记图案
+      const cx = x - 8, cy = y - 8;
+      const inCircle = cx * cx + cy * cy < 56;
+      buf[i] = 0x00;       // R
+      buf[i + 1] = inCircle ? 0x7A : 0x00;  // G
+      buf[i + 2] = inCircle ? 0xFF : 0x00;  // B
+      buf[i + 3] = inCircle ? 0xFF : 0x00;  // A
+    }
+  }
+  return nativeImage.createFromBuffer(buf, { width: size, height: size });
+}
+
+function createTray() {
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip('待办事项记事本');
+  updateTrayMenu();
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+function updateTrayMenu() {
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '显示窗口',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: '关闭时最小化到托盘',
+      type: 'checkbox',
+      checked: closeToTray,
+      click: (menuItem) => {
+        closeToTray = menuItem.checked;
+        saveConfig({ closeToTray });
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '退出',
+      click: () => {
+        closeToTray = false;
+        app.quit();
+      }
+    }
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+// === 任务数据 ===
 function loadTasks() {
   ensureDataDir();
   if (!fs.existsSync(DATA_FILE)) {
@@ -30,7 +116,6 @@ function loadTasks() {
 
 function saveTasks(tasks) {
   ensureDataDir();
-  // 原子写入：先写临时文件，再重命名
   const tmpFile = DATA_FILE + '.tmp';
   try {
     fs.writeFileSync(tmpFile, JSON.stringify(tasks, null, 2), 'utf-8');
@@ -38,20 +123,17 @@ function saveTasks(tasks) {
     return true;
   } catch (e) {
     console.error('保存任务失败:', e.message);
-    // 清理临时文件
-    try { fs.unlinkSync(tmpFile); } catch (_) { /* ignore */ }
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
     return false;
   }
 }
 
-// 保存图片：接收 base64 数据，写入文件，返回文件名
 function saveImage(taskId, base64Data) {
   ensureDataDir();
   const taskImgDir = path.join(IMAGES_DIR, taskId);
   if (!fs.existsSync(taskImgDir)) {
     fs.mkdirSync(taskImgDir, { recursive: true });
   }
-  // 去掉 data:image/...;base64, 前缀
   const matches = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
   const ext = matches ? matches[1] : 'png';
   const raw = matches ? matches[2] : base64Data;
@@ -61,19 +143,16 @@ function saveImage(taskId, base64Data) {
   return filename;
 }
 
-// 删除单张图片
 function deleteImage(taskId, filename) {
   const filepath = path.join(IMAGES_DIR, taskId, filename);
-  try { fs.unlinkSync(filepath); } catch (_) { /* ignore */ }
+  try { fs.unlinkSync(filepath); } catch (_) {}
 }
 
-// 删除任务的所有图片目录
 function deleteImageDir(taskId) {
   const taskImgDir = path.join(IMAGES_DIR, taskId);
-  try { fs.rmSync(taskImgDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+  try { fs.rmSync(taskImgDir, { recursive: true, force: true }); } catch (_) {}
 }
 
-// 读取图片并返回 base64
 function readImageAsBase64(taskId, filename) {
   const filepath = path.join(IMAGES_DIR, taskId, filename);
   try {
@@ -85,8 +164,9 @@ function readImageAsBase64(taskId, filename) {
   }
 }
 
+// === 窗口 ===
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1100,
     height: 700,
     minWidth: 800,
@@ -100,24 +180,50 @@ function createWindow() {
     }
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // 点击关闭按钮时：根据设置决定隐藏还是退出
+  mainWindow.on('close', (event) => {
+    if (closeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
 }
 
+// === 启动 ===
 app.whenReady().then(() => {
-  // 注册 IPC 处理器
+  // 加载配置
+  const config = loadConfig();
+  closeToTray = config.closeToTray !== false;
+
+  // 注册 IPC
   ipcMain.handle('load-tasks', () => loadTasks());
-  ipcMain.handle('save-tasks', (_event, tasks) => {
-    saveTasks(tasks);
-    return true;
-  });
+  ipcMain.handle('save-tasks', (_event, tasks) => { saveTasks(tasks); return true; });
   ipcMain.handle('save-image', (_event, taskId, base64Data) => saveImage(taskId, base64Data));
   ipcMain.handle('delete-image', (_event, taskId, filename) => { deleteImage(taskId, filename); });
   ipcMain.handle('delete-image-dir', (_event, taskId) => { deleteImageDir(taskId); });
   ipcMain.handle('read-image', (_event, taskId, filename) => readImageAsBase64(taskId, filename));
+  ipcMain.handle('get-config', () => ({ closeToTray }));
+  ipcMain.handle('set-config', (_event, config) => {
+    if (config.closeToTray !== undefined) {
+      closeToTray = config.closeToTray;
+      saveConfig({ closeToTray });
+      updateTrayMenu();
+    }
+  });
 
   createWindow();
+  createTray();
 });
 
 app.on('window-all-closed', () => {
-  app.quit();
+  // 不退出，托盘保持运行
+});
+
+app.on('activate', () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
 });

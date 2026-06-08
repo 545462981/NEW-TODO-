@@ -38,6 +38,9 @@ async function init() {
 
   // 设置图片上传
   setupImageUpload();
+
+  // 加载托盘设置
+  await loadTraySetting();
 }
 
 // === 渲染看板 ===
@@ -389,6 +392,37 @@ function getDragAfterElement(container, y) {
 
 // === 启动 ===
 init();
+
+// ============== 托盘设置 ==============
+
+async function loadTraySetting() {
+  try {
+    const config = await window.todoAPI.getConfig();
+    document.getElementById('trayToggle').checked = config.closeToTray;
+  } catch (_) {
+    document.getElementById('trayToggle').checked = true;
+  }
+
+  document.getElementById('trayToggle').addEventListener('change', async (e) => {
+    await window.todoAPI.setConfig({ closeToTray: e.target.checked });
+  });
+}
+
+function toggleSettings(e) {
+  e.stopPropagation();
+  const popover = document.getElementById('settingsPopover');
+  popover.classList.toggle('show');
+
+  if (popover.classList.contains('show')) {
+    const close = (ev) => {
+      if (!popover.contains(ev.target) && ev.target !== document.getElementById('settingsBtn')) {
+        popover.classList.remove('show');
+        document.removeEventListener('click', close);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
 
 // ============== 图片功能 ==============
 
