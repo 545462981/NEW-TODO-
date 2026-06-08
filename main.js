@@ -38,9 +38,12 @@ function saveConfig(config) {
 // === 创建托盘图标 ===
 function createTrayIcon() {
   const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
-  if (fs.existsSync(iconPath)) {
-    return nativeImage.createFromPath(iconPath);
-  }
+  try {
+    if (fs.existsSync(iconPath)) {
+      const buf = fs.readFileSync(iconPath);
+      return nativeImage.createFromBuffer(buf, { width: 16, height: 16 });
+    }
+  } catch (_) {}
   // 降级：没有图标文件时生成一个简单的蓝色方块
   const size = 16;
   const buf = Buffer.alloc(size * size * 4);
